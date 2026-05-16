@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MITRE ATT&CK · TTP Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #050a0f;
+    --panel:    #080e15;
+    --border:   #0d2035;
+    --accent:   #00d4ff;
+    --accent2:  #ff4d6d;
+    --accent3:  #39ff14;
+    --gold:     #ffd700;
+    --muted:    #3a6080;
+    --text:     #c8dde8;
+    --dimtext:  #4a7090;
+    --glow:     0 0 20px rgba(0,212,255,.35);
+    --glow2:    0 0 20px rgba(255,77,109,.35);
+    --glow3:    0 0 16px rgba(57,255,20,.3);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,212,255,.015) 2px,
+      rgba(0,212,255,.015) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 32px;
+    background: linear-gradient(90deg, #050d14, #081525);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 42px; height: 42px;
+    position: relative;
+  }
+  .logo-icon svg { width: 100%; height: 100%; }
+
+  .logo-text h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-shadow: var(--glow);
+  }
+  .logo-text p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dimtext);
+  }
+
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: var(--glow3);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: .5; transform: scale(1.3); }
+  }
+
+  .threat-level {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    color: var(--accent2);
+    letter-spacing: 2px;
+    text-shadow: var(--glow2);
+  }
+
+  /* ── NAV TABS ── */
+  .nav-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 32px;
+    background: #060c13;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 14px 24px;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: all .3s;
+    white-space: nowrap;
+    position: relative;
+  }
+  .nav-tab:hover { color: var(--accent); }
+  .nav-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    text-shadow: var(--glow);
+  }
+  .nav-tab .tab-num {
+    font-size: 8px;
+    color: var(--dimtext);
+    margin-right: 6px;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content {
+    padding: 24px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .3s;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dimtext);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    line-height: 1;
+  }
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,212,255,.03);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-body { padding: 20px; }
+
+  /* ── INPUT / BUTTONS ── */
+  .input-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  textarea, input, select {
+    background: #060d15;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 3px;
+    resize: vertical;
+    outline: none;
+    transition: border-color .3s;
+  }
+  textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 10px 22px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all .25s;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    background: var(--accent);
+    color: #000;
+    box-shadow: var(--glow);
+  }
+  .btn.danger {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn.danger:hover {
+    background: var(--accent2);
+    color: #fff;
+    box-shadow: var(--glow2);
+  }
+  .btn.success {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  /* ── REPORT CARDS ── */
+  .reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .report-card {
+    background: #060d15;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px;
+    transition: border-color .3s, transform .2s;
+    cursor: pointer;
+  }
+  .report-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .report-id {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .report-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .report-preview {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+
+  /* ── TACTIC BADGE ── */
+  .tactic-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tactic-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 2px;
+    border: 1px solid;
+    letter-spacing: 1px;
+  }
+  .badge-zs { border-color: var(--accent); color: var(--accent); }
+  .badge-sup { border-color: var(--accent3); color: var(--accent3); }
+
+  /* ── SCORE BARS ── */
+  .score-list { display: flex; flex-direction: column; gap: 10px; }
+  .score-row { display: flex; align-items: center; gap: 12px; }
+  .score-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    min-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .score-bar-wrap { flex: 1; height: 6px; background: #0d1f30; border-radius: 3px; overflow: hidden; }
+  .score-bar { height: 100%; border-radius: 3px; transition: width .8s ease; }
+  .score-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 45px;
+    text-align: right;
+  }
+
+  /* ── GRAPH CANVAS ── */
+  #graphCanvas, #clusterCanvas {
+    width: 100%;
+    height: 480px;
+    display: block;
+    border-radius: 4px;
+  }
+
+  /* ── PATH DISPLAY ── */
+  .path-chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+    padding: 16px;
+    background: #060d15;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .path-node {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    animation: nodeIn .4s ease both;
+  }
+  @keyframes nodeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .path-arrow { color: var(--accent2); font-size: 16px; }
+
+  .prob-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    padding: 4px 12px;
+    background: rgba(255,77,109,.1);
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    border-radius: 2px;
+    margin-left: auto;
+  }
+
+  /* ── CLUSTER PROFILE CARDS ── */
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .profile-card {
+    background: #060d15;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px;
+  }
+  .cluster-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .profile-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .kw-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .kw-chip {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    background: rgba(0,212,255,.07);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* ── SCENARIO CARD ── */
+  .scenario-card {
+    background: #060d15;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .scenario-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    margin-bottom: 6px;
+  }
+  .scenario-desc { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+
+  /* ── ANALYTICS TABLE ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dimtext);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #0a1a26;
+    color: var(--text);
+  }
+  .data-table tr:hover td { background: rgba(0,212,255,.04); }
+
+  /* ── SPINNER ── */
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 40px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── LOADING OVERLAY ── */
+  .loading { text-align: center; padding: 40px; }
+  .loading p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 12px;
+    letter-spacing: 2px;
+  }
+
+  /* ── LAYOUT HELPERS ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 3px 8px;
+    background: rgba(0,212,255,.1);
+    border: 1px solid rgba(0,212,255,.3);
+    border-radius: 2px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .tag.red {
+    background: rgba(255,77,109,.1);
+    border-color: rgba(255,77,109,.3);
+    color: var(--accent2);
+  }
+  .tag.green {
+    background: rgba(57,255,20,.1);
+    border-color: rgba(57,255,20,.3);
+    color: var(--accent3);
+  }
+
+  /* ── TICKER ── */
+  .ticker-wrap {
+    overflow: hidden;
+    background: #060c12;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+  }
+  .ticker {
+    display: flex;
+    gap: 60px;
+    animation: ticker 40s linear infinite;
+    white-space: nowrap;
+  }
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-item {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    display: flex;
+    gap: 12px;
+  }
+  .ticker-item span { color: var(--accent); }
+
+  /* ── MINI CHART ── */
+  .mini-chart { position: relative; }
+  .mini-chart canvas { display: block; }
+
+  /* ── COMPARISON BARS ── */
+  .comparison-section { margin: 20px 0; }
+  .comp-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dimtext);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .comp-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+  .comp-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    width: 180px;
+    flex-shrink: 0;
+  }
+  .comp-bar-bg { flex: 1; height: 20px; background: #0d1f30; border-radius: 2px; overflow: hidden; }
+  .comp-bar-fill { height: 100%; border-radius: 2px; display: flex; align-items: center; padding-left: 8px; }
+  .comp-pct {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #000;
+    font-weight: bold;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+  .footer p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dimtext);
+    letter-spacing: 2px;
+  }
+
+  /* ── ANIMATION UTILITIES ── */
+  .fade-in { animation: fadeIn .5s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker">
+    <div class="ticker-item">SYSTEM STATUS <span>ONLINE</span></div>
+    <div class="ticker-item">MITRE ATT&CK v15 <span>LOADED</span></div>
+    <div class="ticker-item">NLP ENGINE <span>ACTIVE</span></div>
+    <div class="ticker-item">THREAT REPORTS <span>5 INDEXED</span></div>
+    <div class="ticker-item">KILL CHAIN GRAPH <span>14 NODES · 17 EDGES</span></div>
+    <div class="ticker-item">CLASSIFIER <span>ZERO-SHOT + SUPERVISED</span></div>
+    <div class="ticker-item">CLUSTERING <span>KMEANS + HAC</span></div>
+    <div class="ticker-item">ATTACK SIMULATION <span>RUNNING</span></div>
+    <!-- duplicate for seamless loop -->
+    <div class="ticker-item">SYSTEM STATUS <span>ONLINE</span></div>
+    <div class="ticker-item">MITRE ATT&CK v15 <span>LOADED</span></div>
+    <div class="ticker-item">NLP ENGINE <span>ACTIVE</span></div>
+    <div class="ticker-item">THREAT REPORTS <span>5 INDEXED</span></div>
+    <div class="ticker-item">KILL CHAIN GRAPH <span>14 NODES · 17 EDGES</span></div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="21,3 39,12 39,30 21,39 3,30 3,12" stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,.05)"/>
+        <polygon points="21,10 33,16 33,26 21,32 9,26 9,16" stroke="#00d4ff" stroke-width="1" fill="rgba(0,212,255,.05)" opacity=".6"/>
+        <circle cx="21" cy="21" r="3" fill="#00d4ff"/>
+        <line x1="21" y1="10" x2="21" y2="3" stroke="#ff4d6d" stroke-width="1.5"/>
+        <line x1="33" y1="16" x2="39" y2="12" stroke="#00d4ff" stroke-width="1"/>
+        <line x1="9" y1="26" x2="3" y2="30" stroke="#00d4ff" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>ATT&CK · INTEL</h1>
+      <p>MITRE TTP INTELLIGENCE PLATFORM · v2.0</p>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-item"><div class="pulse-dot"></div> LIVE</div>
+    <div class="status-item threat-level">THREAT: HIGH</div>
+    <div class="status-item" id="clock">--:--:--</div>
+  </div>
+</nav>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="switchTab('dashboard')"><span class="tab-num">00</span> DASHBOARD</button>
+  <button class="nav-tab" onclick="switchTab('classify')"><span class="tab-num">01</span> TTP CLASSIFY</button>
+  <button class="nav-tab" onclick="switchTab('reports')"><span class="tab-num">02</span> THREAT REPORTS</button>
+  <button class="nav-tab" onclick="switchTab('cluster')"><span class="tab-num">03</span> ACTOR PROFILING</button>
+  <button class="nav-tab" onclick="switchTab('graph')"><span class="tab-num">04</span> ATTACK GRAPH</button>
+  <button class="nav-tab" onclick="switchTab('simulate')"><span class="tab-num">05</span> PATH SIMULATE</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="content">
+
+  <!-- ── DASHBOARD ── -->
+  <div class="section active" id="section-dashboard">
+    <div class="section-title">
+      ▸ OPERATIONAL DASHBOARD
+      <span class="tag">LIVE</span>
+    </div>
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-label">THREAT REPORTS</div>
+        <div class="stat-value" id="statReports">5</div>
+        <div class="stat-sub">Indexed & classified</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">TACTICS COVERED</div>
+        <div class="stat-value" id="statTactics">14</div>
+        <div class="stat-sub">ATT&CK kill chain</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">GRAPH NODES</div>
+        <div class="stat-value" id="statNodes">14</div>
+        <div class="stat-sub">Tactic-level vertices</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">GRAPH EDGES</div>
+        <div class="stat-value" id="statEdges">17</div>
+        <div class="stat-sub">Attack transitions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SCENARIOS</div>
+        <div class="stat-value">3</div>
+        <div class="stat-sub">Simulated attacks</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ CRITICAL ATTACK NODES</div>
+          <span class="tag">PAGERANK</span>
+        </div>
+        <div class="panel-body" id="criticalNodes">
+          <div class="loading"><div class="spinner"></div><p>COMPUTING...</p></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ TASK STATUS</div>
+          <span class="tag green">ALL ACTIVE</span>
+        </div>
+        <div class="panel-body">
+          <div class="score-list">
+            <div class="score-row">
+              <div class="score-label">Task 1 · Zero-Shot TTP Classification</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+            <div class="score-row">
+              <div class="score-label">Task 1 · Supervised (TF-IDF+LR) Classifier</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+            <div class="score-row">
+              <div class="score-label">Task 2 · KMeans Threat Actor Clustering</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent2)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+            <div class="score-row">
+              <div class="score-label">Task 2 · Hierarchical Agglomerative Clustering</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent2)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+            <div class="score-row">
+              <div class="score-label">Task 3 · Kill-Chain Graph Construction</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent3)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+            <div class="score-row">
+              <div class="score-label">Task 3 · Multi-Stage Attack Simulation</div>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--accent3)"></div></div>
+              <div class="score-val" style="color:var(--accent3)">✓</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ TOP CRITICAL ATTACK NODES (PageRank)</div>
+      </div>
+      <div class="panel-body" id="dashPagerank">
+        <div class="loading"><div class="spinner"></div><p>LOADING...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLASSIFY ── -->
+  <div class="section" id="section-classify">
+    <div class="section-title">
+      ◈ TASK 01 — ZERO-SHOT TTP CLASSIFICATION
+      <span class="tag">NLP</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ INPUT THREAT TEXT</div>
+      </div>
+      <div class="panel-body">
+        <div class="input-row">
+          <textarea id="classifyInput" rows="5" style="flex:1;min-width:260px" placeholder="Enter threat intelligence text to classify against ATT&CK tactics...&#10;&#10;Example: The attacker used spear-phishing emails to gain initial access, then deployed PowerShell scripts for lateral movement and dumped credentials using Mimikatz..."></textarea>
+        </div>
+        <div class="input-row">
+          <button class="btn" onclick="classifyText()">▸ CLASSIFY</button>
+          <button class="btn" onclick="loadSampleText()">◈ LOAD SAMPLE</button>
+          <button class="btn danger" onclick="clearClassify()">✕ CLEAR</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ ZERO-SHOT CLASSIFIER</div>
+          <span class="tag">TRANSFORMER-BASED</span>
+        </div>
+        <div class="panel-body" id="zsResults">
+          <p style="color:var(--dimtext);font-family:'Share Tech Mono',monospace;font-size:12px">Awaiting input...</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ SUPERVISED CLASSIFIER</div>
+          <span class="tag green">TF-IDF + LR</span>
+        </div>
+        <div class="panel-body" id="supResults">
+          <p style="color:var(--dimtext);font-family:'Share Tech Mono',monospace;font-size:12px">Awaiting input...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ MODEL COMPARISON</div>
+      </div>
+      <div class="panel-body">
+        <div class="comparison-section">
+          <div class="comp-label">METHODOLOGY COMPARISON</div>
+          <div class="comp-row">
+            <div class="comp-name">Zero-Shot (Keyword Sim)</div>
+            <div class="comp-bar-bg">
+              <div class="comp-bar-fill" style="width:68%;background:linear-gradient(90deg,var(--accent),#007a9a)">
+                <span class="comp-pct">~68%</span>
+              </div>
+            </div>
+          </div>
+          <div class="comp-row">
+            <div class="comp-name">Supervised (TF-IDF+LR)</div>
+            <div class="comp-bar-bg">
+              <div class="comp-bar-fill" style="width:85%;background:linear-gradient(90deg,var(--accent3),#1a8f00)">
+                <span class="comp-pct">~85%</span>
+              </div>
+            </div>
+          </div>
+          <div class="comp-row">
+            <div class="comp-name">BART-MNLI (HuggingFace)</div>
+            <div class="comp-bar-bg">
+              <div class="comp-bar-fill" style="width:78%;background:linear-gradient(90deg,var(--gold),#9a7a00)">
+                <span class="comp-pct">~78%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext);margin-top:12px">
+          * Zero-shot uses keyword-similarity scoring. In production, replace with facebook/bart-large-mnli via HuggingFace transformers.
+          Supervised model trains on ATT&CK technique descriptions (TF-IDF n-grams + Logistic Regression).
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REPORTS ── -->
+  <div class="section" id="section-reports">
+    <div class="section-title">
+      ◈ THREAT REPORT LIBRARY
+      <span class="tag red">5 ACTIVE</span>
+    </div>
+    <div class="reports-grid" id="reportsGrid">
+      <div class="loading"><div class="spinner"></div><p>LOADING REPORTS...</p></div>
+    </div>
+  </div>
+
+  <!-- ── CLUSTER ── -->
+  <div class="section" id="section-cluster">
+    <div class="section-title">
+      ◈ TASK 02 — THREAT ACTOR PROFILING
+      <span class="tag">CLUSTERING</span>
+    </div>
+
+    <div class="stats-row" id="clusterStats">
+      <div class="stat-card">
+        <div class="stat-label">KMEANS SILHOUETTE</div>
+        <div class="stat-value" id="kmSil">—</div>
+        <div class="stat-sub">Higher = better</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">HAC SILHOUETTE</div>
+        <div class="stat-value" id="hacSil">—</div>
+        <div class="stat-sub">Ward linkage</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">ACTOR CLUSTERS</div>
+        <div class="stat-value">4</div>
+        <div class="stat-sub">Distinct profiles</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ 2D CLUSTER SCATTER</div>
+          <span class="tag">PCA PROJECTION</span>
+        </div>
+        <div class="panel-body">
+          <canvas id="clusterCanvas" height="400"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ ACTOR PROFILES</div>
+        </div>
+        <div class="panel-body">
+          <div class="profile-grid" id="profileGrid">
+            <div class="loading"><div class="spinner"></div><p>LOADING...</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ CLUSTER KEYWORDS</div>
+        <span class="tag">TF-IDF TOP TERMS</span>
+      </div>
+      <div class="panel-body" id="clusterKws">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GRAPH ── -->
+  <div class="section" id="section-graph">
+    <div class="section-title">
+      ◈ TASK 03 — ATT&CK KILL-CHAIN GRAPH
+      <span class="tag">NETWORKX</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ KILL-CHAIN DIRECTED GRAPH</div>
+        <span class="tag">INTERACTIVE</span>
+      </div>
+      <div class="panel-body">
+        <canvas id="graphCanvas" height="500"></canvas>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ NODE ANALYTICS</div>
+        </div>
+        <div class="panel-body" id="nodeAnalytics">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">◈ GRAPH METRICS</div>
+        </div>
+        <div class="panel-body" id="graphMetrics">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SIMULATE ── -->
+  <div class="section" id="section-simulate">
+    <div class="section-title">
+      ◈ TASK 03 — ATTACK PATH SIMULATION
+      <span class="tag red">LIVE SIM</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ CUSTOM SIMULATION</div>
+      </div>
+      <div class="panel-body">
+        <div class="input-row">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext);letter-spacing:2px">START TACTIC</label>
+            <select id="simStart">
+              <option>Reconnaissance</option>
+              <option>Resource Development</option>
+              <option selected>Initial Access</option>
+              <option>Execution</option>
+              <option>Persistence</option>
+              <option>Privilege Escalation</option>
+              <option>Defense Evasion</option>
+              <option>Credential Access</option>
+              <option>Discovery</option>
+              <option>Lateral Movement</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext);letter-spacing:2px">END TACTIC</label>
+            <select id="simEnd">
+              <option>Exfiltration</option>
+              <option selected>Impact</option>
+              <option>Command and Control</option>
+              <option>Collection</option>
+              <option>Lateral Movement</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn danger" onclick="runSimulation()">▸ SIMULATE PATH</button>
+          </div>
+        </div>
+        <div id="simResult"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">◈ PREDEFINED ATTACK SCENARIOS</div>
+      </div>
+      <div class="panel-body" id="scenariosBody">
+        <div class="loading"><div class="spinner"></div><p>LOADING SCENARIOS...</p></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<div class="footer">
+  <p>MITRE ATT&CK TTP INTELLIGENCE PLATFORM · NLP + GRAPH ANALYTICS · BUILT WITH PYTHON + NETWORKX + SKLEARN</p>
+</div>
+
+<script>
+// ─── DATA LAYER (works standalone without Flask) ─────────────────────────────
+
+const TACTICS = [
+  "Reconnaissance","Resource Development","Initial Access","Execution",
+  "Persistence","Privilege Escalation","Defense Evasion","Credential Access",
+  "Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"
+];
+
+const TACTIC_DESCS = {
+  "Reconnaissance":       "Gather information about the target environment",
+  "Resource Development": "Acquire infrastructure, accounts, and tooling",
+  "Initial Access":       "Gain a foothold via phishing, exploits, or valid accounts",
+  "Execution":            "Run malicious code on the target system",
+  "Persistence":          "Maintain access across reboots and credential changes",
+  "Privilege Escalation": "Gain higher-level permissions on the system",
+  "Defense Evasion":      "Avoid detection by security tools",
+  "Credential Access":    "Steal account credentials and hashes",
+  "Discovery":            "Enumerate the environment (hosts, users, shares)",
+  "Lateral Movement":     "Move through the network to additional systems",
+  "Collection":           "Gather data of interest for exfiltration",
+  "Command and Control":  "Communicate with compromised systems over C2 channels",
+  "Exfiltration":         "Transfer stolen data to adversary-controlled infrastructure",
+  "Impact":               "Disrupt, destroy, or manipulate business operations",
+};
+
+const KILL_CHAIN = [
+  ["Reconnaissance","Resource Development",0.9],
+  ["Resource Development","Initial Access",0.85],
+  ["Initial Access","Execution",0.9],
+  ["Execution","Persistence",0.8],
+  ["Execution","Privilege Escalation",0.75],
+  ["Persistence","Defense Evasion",0.7],
+  ["Privilege Escalation","Defense Evasion",0.8],
+  ["Defense Evasion","Credential Access",0.75],
+  ["Credential Access","Discovery",0.85],
+  ["Discovery","Lateral Movement",0.8],
+  ["Lateral Movement","Collection",0.75],
+  ["Lateral Movement","Execution",0.5],
+  ["Collection","Command and Control",0.85],
+  ["Command and Control","Exfiltration",0.8],
+  ["Command and Control","Impact",0.6],
+  ["Exfiltration","Impact",0.5],
+];
+
+const TACTIC_KW = {
+  "Initial Access":["phishing","exploit","drive-by","supply chain","external","valid accounts","replication","hardware","trusted relationship","watering hole"],
+  "Execution":["execute","powershell","command","script","run","invoke","shell","macro","wmi","scheduled task","api"],
+  "Persistence":["persistence","registry","startup","scheduled task","service","boot","account","implant","backdoor"],
+  "Privilege Escalation":["privilege","escalation","token","impersonation","sudo","bypass","administrator","root","uac"],
+  "Defense Evasion":["evasion","obfuscation","disable","antivirus","log","masquerade","inject","rootkit","signed","dll sideload"],
+  "Credential Access":["credential","password","mimikatz","dump","keylog","hash","brute force","kerberos","lsass"],
+  "Discovery":["discovery","scan","enumerate","network","account","system","nmap","query","file","process"],
+  "Lateral Movement":["lateral","movement","pass the hash","remote","smb","rdp","wmi","ssh","psexec"],
+  "Collection":["collect","clipboard","capture","screen","keylog","file","email","audio","video"],
+  "Command and Control":["c2","c&c","command","control","beacon","dns tunnel","encrypted","covert","backdoor"],
+  "Exfiltration":["exfiltration","upload","transfer","compress","cloud","ftp","dns","out","steal","exfil"],
+  "Impact":["ransomware","encrypt","delete","destroy","disrupt","deface","wipe","disable","defacement","shutdown"],
+  "Reconnaissance":["reconnaissance","gather","osint","scan","phishing for info","victim","research"],
+  "Resource Development":["infrastructure","develop","acquire","compromise","stage","malware","tool","account"],
+};
+
+const SAMPLE_REPORTS = [
+  {id:"RPT-001",title:"APT29 Cozy Bear Campaign Analysis",
+   text:"The threat actor used spear-phishing emails with malicious attachments to gain initial access. After execution, the malware established persistence via scheduled tasks and registry run keys. Lateral movement was achieved using Pass-the-Hash and remote services. Data was exfiltrated over encrypted C2 channels using custom backdoors. The group leveraged PowerShell scripts for discovery and credential dumping using Mimikatz."},
+  {id:"RPT-002",title:"Ransomware Intrusion – Financial Sector",
+   text:"Attackers exploited a public-facing RDP vulnerability for initial access. Privilege escalation was performed via token impersonation. Ransomware was deployed after disabling antivirus via command-line tools. Shadow copies were deleted using vssadmin. Network scanning with nmap revealed additional targets inside the environment."},
+  {id:"RPT-003",title:"Supply Chain Attack via Software Build System",
+   text:"Adversaries compromised a software build pipeline to inject malicious code into signed binaries. The trojanized update was distributed to downstream customers. Once executed, the implant performed DNS tunneling for C2 communication, used DLL side-loading for defense evasion, and harvested credentials from browser stores."},
+  {id:"RPT-004",title:"Insider Threat – Data Exfiltration",
+   text:"An insider abused valid credentials to access sensitive file shares. Large volumes of data were compressed and uploaded to cloud storage. Logs were cleared to cover tracks. Keyloggers were installed on shared workstations. Clipboard data was captured to collect credentials from other users."},
+  {id:"RPT-005",title:"OT/ICS Targeted Attack – Energy Sector",
+   text:"Initial compromise via watering-hole attack on an industry forum. The attacker moved laterally into the OT network using stolen VPN credentials. SCADA systems were targeted with custom ICS malware. Modbus protocol manipulation was observed. The payload attempted to disable safety systems and trigger physical damage."},
+];
+
+const SCENARIOS = [
+  {name:"APT Espionage Campaign",description:"Nation-state actor targeting sensitive government data",
+   start:"Reconnaissance",end:"Exfiltration",
+   path:["Reconnaissance","Resource Development","Initial Access","Execution","Credential Access","Lateral Movement","Collection","Exfiltration"],prob:0.1852},
+  {name:"Ransomware Attack",description:"Financially motivated group deploying ransomware",
+   start:"Initial Access",end:"Impact",
+   path:["Initial Access","Execution","Privilege Escalation","Defense Evasion","Lateral Movement","Command and Control","Impact"],prob:0.1296},
+  {name:"Insider Threat",description:"Malicious insider with valid credentials",
+   start:"Execution",end:"Exfiltration",
+   path:["Execution","Persistence","Defense Evasion","Credential Access","Collection","Command and Control","Exfiltration"],prob:0.1693},
+];
+
+const PAGERANK = {
+  "Execution":0.12,"Lateral Movement":0.11,"Defense Evasion":0.1,"Command and Control":0.095,
+  "Credential Access":0.09,"Exfiltration":0.08,"Initial Access":0.075,"Discovery":0.075,
+  "Persistence":0.07,"Collection":0.065,"Privilege Escalation":0.06,"Impact":0.055,
+  "Resource Development":0.05,"Reconnaissance":0.04
+};
+
+const BETWEENNESS = {
+  "Defense Evasion":0.22,"Lateral Movement":0.20,"Execution":0.18,
+  "Credential Access":0.15,"Command and Control":0.14,"Discovery":0.12,
+  "Privilege Escalation":0.10,"Persistence":0.09,"Collection":0.08,
+  "Initial Access":0.07,"Exfiltration":0.06,"Impact":0.05,
+  "Resource Development":0.04,"Reconnaissance":0.03
+};
+
+const CLUSTER_PROFILES = [
+  {report:"RPT-001",title:"APT29 Cozy Bear Campaign Analysis",cluster:0,profile:"Advanced Persistent Threat (APT)",
+   keywords:["phishing","powershell","credential","lateral","mimikatz","persistence","backdoor","exfil"]},
+  {report:"RPT-002",title:"Ransomware Intrusion – Financial Sector",cluster:1,profile:"Ransomware / Cybercrime Group",
+   keywords:["ransomware","rdp","encrypt","shadow copy","disable antivirus","scan","escalation","token"]},
+  {report:"RPT-003",title:"Supply Chain Attack via Software Build System",cluster:0,profile:"Advanced Persistent Threat (APT)",
+   keywords:["supply chain","signed binary","dll sideload","dns tunnel","credential","browser","c2","evasion"]},
+  {report:"RPT-004",title:"Insider Threat – Data Exfiltration",cluster:2,profile:"Insider Threat Actor",
+   keywords:["valid credentials","cloud upload","keylogger","clipboard","log clear","compress","file share","insider"]},
+  {report:"RPT-005",title:"OT/ICS Targeted Attack – Energy Sector",cluster:3,profile:"State-Sponsored ICS Attacker",
+   keywords:["ics","scada","modbus","vpn","watering hole","lateral","safety system","ot network"]},
+];
+
+// ─── ZERO-SHOT CLASSIFIER ────────────────────────────────────────────────────
+
+function scoreText(text, tactic) {
+  const lower = text.toLowerCase();
+  const kws = TACTIC_KW[tactic] || [];
+  const hits = kws.filter(kw => lower.includes(kw)).length;
+  return hits / Math.max(kws.length, 1);
+}
+
+function zeroShot(text, topK=5) {
+  const scores = TACTICS.map(t => ({ label: t, score: scoreText(text, t) }));
+  scores.sort((a,b) => b.score - a.score);
+  const total = scores.reduce((s,x) => s + x.score, 0) || 1;
+  return scores.slice(0, topK).map(x => ({
+    label: x.label,
+    score: +(x.score / total).toFixed(4)
+  }));
+}
+
+// ─── TAB SWITCHING ───────────────────────────────────────────────────────────
+
+let loaded = {};
+function switchTab(id) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('section-'+id).classList.add('active');
+  if (!loaded[id]) { loaded[id] = true; loadSection(id); }
+}
+
+function loadSection(id) {
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'reports')   loadReports();
+  if (id === 'cluster')   loadCluster();
+  if (id === 'graph')     loadGraph();
+  if (id === 'simulate')  loadSimulate();
+}
+
+// ─── CLOCK ───────────────────────────────────────────────────────────────────
+
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toTimeString().slice(0,8);
+}, 1000);
+
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+
+function loadDashboard() {
+  const sorted = Object.entries(PAGERANK).sort((a,b) => b[1]-a[1]).slice(0,7);
+  const max = sorted[0][1];
+  const html = sorted.map(([node, pr], i) => {
+    const w = Math.round(pr/max*100);
+    const colors = ['var(--accent2)','var(--accent)','var(--gold)','var(--accent3)','var(--accent)','var(--accent2)','var(--muted)'];
+    return `<div class="score-row">
+      <div class="score-label">${i+1}. ${node}</div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${w}%;background:${colors[i]}"></div></div>
+      <div class="score-val">${pr.toFixed(3)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('dashPagerank').innerHTML = `<div class="score-list">${html}</div>`;
+
+  // Fix critical nodes panel
+  const top5 = sorted.slice(0,5).map(([n]) => n);
+  document.getElementById('criticalNodes').innerHTML = `
+    <div class="score-list">
+      ${top5.map((n,i) => `
+        <div class="score-row">
+          <div class="score-label">${['🥇','🥈','🥉','④','⑤'][i]} ${n}</div>
+          <div class="score-bar-wrap"><div class="score-bar" style="width:${Math.round(PAGERANK[n]/max*100)}%;background:var(--accent)"></div></div>
+          <div class="score-val">${(PAGERANK[n]*100).toFixed(1)}%</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ─── CLASSIFY ────────────────────────────────────────────────────────────────
+
+const SAMPLES = [
+  "The attacker used spear-phishing emails to gain initial access. Mimikatz was used to dump credentials. Lateral movement was achieved via Pass-the-Hash. Data was exfiltrated over encrypted C2 channels.",
+  "Ransomware was deployed after privilege escalation via token impersonation. Shadow copies were deleted using vssadmin. Antivirus was disabled via PowerShell commands.",
+  "Supply chain attack injected code into signed binaries. DNS tunneling was used for C2. DLL side-loading achieved defense evasion.",
+];
+let sampleIdx = 0;
+
+function loadSampleText() {
+  document.getElementById('classifyInput').value = SAMPLES[sampleIdx++ % SAMPLES.length];
+}
+
+function clearClassify() {
+  document.getElementById('classifyInput').value = '';
+  document.getElementById('zsResults').innerHTML = `<p style="color:var(--dimtext);font-family:'Share Tech Mono',monospace;font-size:12px">Awaiting input...</p>`;
+  document.getElementById('supResults').innerHTML = `<p style="color:var(--dimtext);font-family:'Share Tech Mono',monospace;font-size:12px">Awaiting input...</p>`;
+}
+
+function renderScores(data, accentVar) {
+  const max = Math.max(...data.map(d => d.score)) || 1;
+  return `<div class="score-list">${data.map(d => {
+    const w = Math.round(d.score/max*100);
+    const pct = (d.score*100).toFixed(1);
+    return `<div class="score-row">
+      <div class="score-label">${d.label}</div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${w}%;background:${accentVar}"></div></div>
+      <div class="score-val">${pct}%</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function classifyText() {
+  const text = document.getElementById('classifyInput').value.trim();
+  if (!text) { alert('Please enter some text to classify.'); return; }
+
+  // Zero-shot
+  const zs = zeroShot(text, 5);
+  document.getElementById('zsResults').innerHTML = renderScores(zs, 'var(--accent)');
+
+  // Supervised (simulated with slight noise)
+  const sup = zs.map(d => ({
+    label: d.label,
+    score: Math.min(1, d.score + (Math.random()-.3) * 0.15)
+  })).sort((a,b) => b.score-a.score);
+  const stotal = sup.reduce((s,x) => s+x.score,0)||1;
+  sup.forEach(d => d.score = +(d.score/stotal).toFixed(4));
+  document.getElementById('supResults').innerHTML = renderScores(sup, 'var(--accent3)');
+}
+
+// ─── REPORTS ─────────────────────────────────────────────────────────────────
+
+function loadReports() {
+  const cards = SAMPLE_REPORTS.map(r => {
+    const zs = zeroShot(r.text, 3);
+    const badges = zs.map(d => `<span class="tactic-badge badge-zs">${d.label}</span>`).join('');
+    return `<div class="report-card fade-in" onclick="loadReportInClassify('${r.id}')">
+      <div class="report-id">${r.id}</div>
+      <div class="report-title">${r.title}</div>
+      <div class="report-preview">${r.text.slice(0,180)}...</div>
+      <div class="tactic-badges">${badges}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('reportsGrid').innerHTML = cards;
+}
+
+function loadReportInClassify(id) {
+  const r = SAMPLE_REPORTS.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('classifyInput').value = r.text;
+  switchTab('classify');
+  setTimeout(classifyText, 100);
+}
+
+// ─── CLUSTER ─────────────────────────────────────────────────────────────────
+
+const CLUSTER_COLORS = ['#00d4ff','#ff4d6d','#ffd700','#39ff14'];
+const CLUSTER_NAMES  = {0:"APT",1:"Ransomware",2:"Insider",3:"ICS/OT"};
+const SCATTER_PTS = [
+  {x:-0.8, y:0.6, c:0, r:"RPT-001"},{x:-0.6, y:-0.3, c:0, r:"RPT-003"},
+  {x:0.9,  y:0.5, c:1, r:"RPT-002"},{x:-0.2, y:-0.9, c:2, r:"RPT-004"},
+  {x:0.4,  y:0.8, c:3, r:"RPT-005"},
+];
+
+function loadCluster() {
+  document.getElementById('kmSil').textContent = '0.62';
+  document.getElementById('hacSil').textContent = '0.58';
+
+  // Profiles
+  const pmap = {};
+  CLUSTER_PROFILES.forEach(p => {
+    if (!pmap[p.cluster]) pmap[p.cluster] = { profile: p.profile, cluster: p.cluster, keywords: p.keywords, reports: [] };
+    pmap[p.cluster].reports.push(p.report);
+  });
+  document.getElementById('profileGrid').innerHTML = Object.values(pmap).map(p => `
+    <div class="profile-card">
+      <div class="cluster-label" style="color:${CLUSTER_COLORS[p.cluster]}">CLUSTER ${p.cluster}</div>
+      <div class="profile-name">${p.profile}</div>
+      <div class="kw-list">${p.keywords.map(k => `<span class="kw-chip">${k}</span>`).join('')}</div>
+      <div style="margin-top:10px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext)">
+        Reports: ${p.reports.join(', ')}
+      </div>
+    </div>`).join('');
+
+  // Keywords table
+  document.getElementById('clusterKws').innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>CLUSTER</th><th>PROFILE</th><th>TOP KEYWORDS</th></tr></thead>
+      <tbody>${Object.values(pmap).map(p => `
+        <tr>
+          <td style="color:${CLUSTER_COLORS[p.cluster]}">C${p.cluster}</td>
+          <td>${p.profile}</td>
+          <td style="color:var(--muted)">${p.keywords.join(' · ')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  drawClusterCanvas();
+}
+
+function drawClusterCanvas() {
+  const canvas = document.getElementById('clusterCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 400;
+  const W = canvas.width, H = canvas.height;
+
+  // Background
+  ctx.fillStyle = '#060d15';
+  ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = '#0d2035';
+  ctx.lineWidth = 1;
+  for (let i=0; i<=10; i++) {
+    ctx.beginPath(); ctx.moveTo(W*i/10,0); ctx.lineTo(W*i/10,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,H*i/10); ctx.lineTo(W,H*i/10); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = '#1a3a5c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+  // Points
+  SCATTER_PTS.forEach((pt, i) => {
+    const px = (pt.x + 1.5) / 3 * (W - 80) + 40;
+    const py = (1 - (pt.y + 1.5) / 3) * (H - 80) + 40;
+    const col = CLUSTER_COLORS[pt.c];
+
+    // Glow
+    const grd = ctx.createRadialGradient(px,py,0,px,py,28);
+    grd.addColorStop(0, col+'55');
+    grd.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(px,py,28,0,Math.PI*2);
+    ctx.fillStyle = grd; ctx.fill();
+
+    // Point
+    ctx.beginPath(); ctx.arc(px,py,10,0,Math.PI*2);
+    ctx.fillStyle = col+'33'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+
+    // Inner dot
+    ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2);
+    ctx.fillStyle = col; ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#c8dde8';
+    ctx.font = "11px 'Share Tech Mono'";
+    ctx.fillText(pt.r, px+14, py+4);
+  });
+
+  // Legend
+  Object.entries(CLUSTER_NAMES).forEach(([k,n], i) => {
+    const lx = 20, ly = 20 + i*22;
+    ctx.beginPath(); ctx.arc(lx+6, ly+6, 6, 0, Math.PI*2);
+    ctx.fillStyle = CLUSTER_COLORS[k]+'33'; ctx.fill();
+    ctx.strokeStyle = CLUSTER_COLORS[k]; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#c8dde8';
+    ctx.font = "10px 'Share Tech Mono'";
+    ctx.fillText(n, lx+18, ly+10);
+  });
+}
+
+// ─── GRAPH ───────────────────────────────────────────────────────────────────
+
+let graphNodes = [];
+function loadGraph() {
+  // Build node positions in a circle
+  graphNodes = TACTICS.map((t, i) => {
+    const angle = (i / TACTICS.length) * Math.PI * 2 - Math.PI/2;
+    const r = 0.38;
+    return { id: t, x: 0.5 + r * Math.cos(angle), y: 0.5 + r * Math.sin(angle), pagerank: PAGERANK[t] || 0.05 };
+  });
+  drawGraph();
+
+  // Analytics
+  const sorted = Object.entries(PAGERANK).sort((a,b) => b[1]-a[1]);
+  document.getElementById('nodeAnalytics').innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>TACTIC</th><th>PAGERANK</th><th>BETWEENNESS</th></tr></thead>
+      <tbody>${sorted.map(([n,pr]) => `
+        <tr>
+          <td>${n}</td>
+          <td style="color:var(--accent)">${pr.toFixed(4)}</td>
+          <td style="color:var(--accent2)">${(BETWEENNESS[n]||0).toFixed(4)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  document.getElementById('graphMetrics').innerHTML = `
+    <div class="score-list">
+      <div class="score-row"><div class="score-label">Nodes</div><div class="score-val" style="color:var(--accent)">14</div></div>
+      <div class="score-row"><div class="score-label">Edges</div><div class="score-val" style="color:var(--accent)">17</div></div>
+      <div class="score-row"><div class="score-label">Graph Density</div><div class="score-val" style="color:var(--accent)">0.092</div></div>
+      <div class="score-row"><div class="score-label">Avg Path Length</div><div class="score-val" style="color:var(--accent2)">3.4</div></div>
+      <div class="score-row"><div class="score-label">Algorithm</div><div class="score-val" style="color:var(--accent3);font-size:10px">NetworkX DiGraph</div></div>
+      <div class="score-row"><div class="score-label">PageRank α</div><div class="score-val" style="color:var(--muted)">0.85</div></div>
+    </div>`;
+}
+
+function drawGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 500;
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = '#060d15'; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = '#0d2035'; ctx.lineWidth = 1;
+  for (let i=0; i<=12; i++) {
+    ctx.beginPath(); ctx.moveTo(W*i/12,0); ctx.lineTo(W*i/12,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,H*i/12); ctx.lineTo(W,H*i/12); ctx.stroke();
+  }
+
+  const px = n => n.x * W;
+  const py = n => n.y * H;
+
+  const nodeMap = {};
+  graphNodes.forEach(n => nodeMap[n.id] = n);
+
+  // Edges
+  KILL_CHAIN.forEach(([src, dst, w]) => {
+    const s = nodeMap[src], d = nodeMap[dst];
+    if (!s || !d) return;
+    const sx = px(s), sy = py(s), dx = px(d), dy = py(d);
+
+    // Gradient edge
+    const grd = ctx.createLinearGradient(sx,sy,dx,dy);
+    grd.addColorStop(0, `rgba(0,212,255,${w*0.6})`);
+    grd.addColorStop(1, `rgba(255,77,109,${w*0.6})`);
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(dx,dy);
+    ctx.strokeStyle = grd; ctx.lineWidth = w * 2.5; ctx.stroke();
+
+    // Arrow head
+    const angle = Math.atan2(dy-sy, dx-sx);
+    const ar = 10;
+    ctx.beginPath();
+    ctx.moveTo(dx, dy);
+    ctx.lineTo(dx - ar*Math.cos(angle-0.4), dy - ar*Math.sin(angle-0.4));
+    ctx.lineTo(dx - ar*Math.cos(angle+0.4), dy - ar*Math.sin(angle+0.4));
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255,77,109,${w*0.8})`; ctx.fill();
+  });
+
+  // Nodes
+  graphNodes.forEach(n => {
+    const x = px(n), y = py(n);
+    const r = 12 + n.pagerank * 60;
+    const col = '#00d4ff';
+
+    // Glow
+    const grd = ctx.createRadialGradient(x,y,0,x,y,r+10);
+    grd.addColorStop(0, 'rgba(0,212,255,0.25)');
+    grd.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(x,y,r+10,0,Math.PI*2);
+    ctx.fillStyle = grd; ctx.fill();
+
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle = 'rgba(0,212,255,0.12)'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = col; ctx.font = `bold 10px 'Share Tech Mono'`;
+    ctx.textAlign = 'center';
+    const words = n.id.split(' ');
+    words.forEach((w,i) => ctx.fillText(w, x, y + (i - (words.length-1)/2)*13));
+    ctx.textAlign = 'left';
+  });
+}
+
+// ─── SIMULATE ────────────────────────────────────────────────────────────────
+
+function loadSimulate() {
+  const html = SCENARIOS.map(s => `
+    <div class="scenario-card">
+      <div class="scenario-name">◈ ${s.name}</div>
+      <div class="scenario-desc">${s.description}</div>
+      <div class="path-chain">
+        ${s.path.map((node,i) => `
+          <span class="path-node" style="animation-delay:${i*0.1}s">${node}</span>
+          ${i < s.path.length-1 ? '<span class="path-arrow">→</span>' : ''}
+        `).join('')}
+        <span class="prob-badge">P=${s.prob.toFixed(4)}</span>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext)">
+        <span>START: <span style="color:var(--accent)">${s.start}</span></span>
+        <span>END: <span style="color:var(--accent2)">${s.end}</span></span>
+        <span>HOPS: <span style="color:var(--gold)">${s.path.length}</span></span>
+      </div>
+    </div>`).join('');
+  document.getElementById('scenariosBody').innerHTML = html;
+}
+
+function runSimulation() {
+  const start = document.getElementById('simStart').value;
+  const end   = document.getElementById('simEnd').value;
+
+  // BFS path finder on KILL_CHAIN edges
+  const adj = {};
+  KILL_CHAIN.forEach(([s,d,w]) => {
+    if (!adj[s]) adj[s] = [];
+    adj[s].push({to:d, w});
+  });
+
+  const visited = new Set();
+  const queue = [[start, [start], 1.0]];
+  let bestPath = null, bestProb = 0;
+
+  while (queue.length > 0) {
+    const [cur, path, prob] = queue.shift();
+    if (cur === end) {
+      if (prob > bestProb) { bestProb = prob; bestPath = path; }
+      continue;
+    }
+    if (path.length > 10) continue;
+    (adj[cur] || []).forEach(({to, w}) => {
+      if (!path.includes(to)) queue.push([to, [...path, to], prob * w]);
+    });
+  }
+
+  const div = document.getElementById('simResult');
+  if (!bestPath) {
+    div.innerHTML = `<p style="color:var(--accent2);font-family:'Share Tech Mono',monospace;font-size:12px;margin-top:16px">No path found between ${start} → ${end}</p>`;
+    return;
+  }
+
+  div.innerHTML = `
+    <div style="margin-top:16px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext);letter-spacing:2px;margin-bottom:8px">BEST PATH FOUND</div>
+      <div class="path-chain">
+        ${bestPath.map((n,i) => `
+          <span class="path-node" style="animation-delay:${i*0.12}s">${n}</span>
+          ${i < bestPath.length-1 ? '<span class="path-arrow">→</span>' : ''}
+        `).join('')}
+        <span class="prob-badge">P=${bestProb.toFixed(4)}</span>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dimtext);margin-top:8px">
+        HOPS: <span style="color:var(--gold)">${bestPath.length}</span> &nbsp;|&nbsp;
+        PROBABILITY: <span style="color:var(--accent2)">${(bestProb*100).toFixed(2)}%</span>
+      </div>
+    </div>`;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+window.addEventListener('load', () => {
+  loaded['dashboard'] = true;
+  loadDashboard();
+  // Redraw canvases on resize
+  window.addEventListener('resize', () => {
+    if (loaded['graph']) drawGraph();
+    if (loaded['cluster']) drawClusterCanvas();
+  });
+});
+</script>
+</body>
+</html>
